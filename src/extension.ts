@@ -8,27 +8,29 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        // 2. Активируем его и запрашиваем API (версии 1)
         const activatedExtension = await gitExtension.activate();
         const gitAPI = activatedExtension.getAPI(1);
 
-        // 3. Берём первый активный репозиторий (или текущий открытый)
         vscode.window.showWarningMessage(gitAPI.repositories[0]);
         const repository = gitAPI.repositories[0];
+
+        let lastCommitHash: string | undefined;
+        
         if (!repository) {
             vscode.window.showWarningMessage('Не удалось определить repository');
             return;
         }
 
-        // 4. Получаем состояние HEAD
+        // 64ffbcd066d4729c2d834494b648d33881999564 
+
         const head = repository.state.HEAD;
 
-        let lastCommitHash: string | undefined;
 
         if (head && head.commit) {
             lastCommitHash = head.commit;
         } else {
             vscode.window.showWarningMessage('Не удалось определить хеш (возможно, в репозитории еще нет коммитов).');
+            return;
         }
 
         const writeEmitter = new vscode.EventEmitter<string>();
