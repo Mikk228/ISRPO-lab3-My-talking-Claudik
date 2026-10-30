@@ -11,21 +11,17 @@ const phrase_welcom = [
     "Welcome back, developer!",
 ];
 const phrase_commits = [
-    "Another milestone reached!",
     "Saved in history forever!",
     "Git happens!",
     "Commit successful. I'm proud!",
-    "Our history is growing!",
-    "That's a solid contribution!",
     "Another piece of the puzzle!",
-    "Progress has been recorded!"
 ];
 
-function buildFrames(hash: string, experience: number, state_xp: string, statePhrase: string): string[][] {
+function buildFrames(hash: string, experience: number, state_xp: string, phrase: string): string[][] {
     const head = [
         ' $ claudik',
         '',
-        `   * ${statePhrase}`,
+        `   * ${phrase}`,
         '',
     ];
     const tail = [
@@ -42,7 +38,7 @@ function buildFrames(hash: string, experience: number, state_xp: string, statePh
     ];
 }
 
-function getRandomPhrase(phrases: string[]): string {
+function GetRandomPhrase(phrases: string[]): string {
     return phrases[Math.floor(Math.random() * phrases.length)];
 }
 
@@ -51,12 +47,16 @@ export function activate(context: vscode.ExtensionContext) {
 
         let experience: number = context.globalState.get<number>('experience', 0);
         let prev_hash: string = context.globalState.get<string>('prev_hash', '');
-        let state_xp: string = '';
-        let statePhrase: string = getRandomPhrase(phrase_welcom);
 
-        async function addExperience(amount: number) {
+        let state_xp: string = '';
+        let time_xp_show = 0;
+
+        let phrase: string = GetRandomPhrase(phrase_welcom);
+
+        async function AddExperience(amount: number) {
             experience += amount;
             state_xp = `+ ${amount}xp`;
+            time_xp_show = Date.now() + 2000;
 
             await context.globalState.update('experience', experience);
         }    
@@ -77,38 +77,40 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const writeEmitter = new vscode.EventEmitter<string>();
-        let frameIndex = 0;
+        let frame_index = 0;
         let timer: NodeJS.Timeout | undefined;
         let stateSubscription: vscode.Disposable | undefined;
 
-        const renderFrame = () => {
+        const RenderFrame = () => {
             const hash = repository.state.HEAD?.commit ?? 'No commits yet';
             if (hash !== prev_hash) {
-                addExperience(50);
+                AddExperience(50);
                 prev_hash = hash;
 
-                statePhrase = getRandomPhrase(phrase_commits);
+                phrase = GetRandomPhrase(phrase_commits);
 
                 context.globalState.update('prev_hash', prev_hash);
             }
-            const frames = buildFrames(hash, experience, state_xp, statePhrase);
+
+            state_xp = Date.now() < time_xp_show ? state_xp : '';
+            const frames = buildFrames(hash, experience, state_xp, phrase);
 
             let output = '\x1b[H';
-            for (const line of frames[frameIndex]) {
+
+            for (const line of frames[frame_index]) {
                 output += line.padEnd(LINE_WIDTH, ' ') + '\r\n';
             }
             writeEmitter.fire(output);
 
-            frameIndex = (frameIndex + 1) % frames.length;
-            state_xp = '';
+            frame_index = (frame_index + 1) % frames.length;
         };
 
         const pty: vscode.Pseudoterminal = {
             onDidWrite: writeEmitter.event,
             open: () => {
-                renderFrame();
-                timer = setInterval(renderFrame, 500);
-                stateSubscription = repository.state.onDidChange(renderFrame);
+                RenderFrame();
+                timer = setInterval(RenderFrame, 500);
+                stateSubscription = repository.state.onDidChange(RenderFrame);
             },
             close: () => {
                 if (timer) {
