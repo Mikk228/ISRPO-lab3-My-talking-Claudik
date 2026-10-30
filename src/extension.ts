@@ -21,7 +21,14 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        // 64ffbcd066d4729c2d834494b648d33881999564 
+        repository.state.onDidChange(() => {
+        lastCommitHash = repository.state.HEAD?.commit ?? 'No commits yet';
+
+        renderFrame();
+        });
+
+        // 64ffbcd066d4729c2d834494b648d33881999564
+        // 64ffbcd066d4729c2d834494b648d33881999564   
 
         const head = repository.state.HEAD;
 
@@ -77,9 +84,7 @@ export function activate(context: vscode.ExtensionContext) {
         const renderFrame = () => {
     	let output = '\x1b[H';
 
-        if (head && head.commit) {
-            lastCommitHash = head.commit;
-        }
+        lastCommitHash = repository.state.HEAD?.commit ?? 'No commits yet';
 
     	for (const line of frames[frameIndex]) {
     		    output += line.padEnd(44, ' ') + '\r\n';
