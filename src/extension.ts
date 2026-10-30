@@ -1,5 +1,27 @@
 import * as vscode from 'vscode';
 
+const LINE_WIDTH = 70;
+
+function buildFrames(hash: string): string[][] {
+    const head = [
+        ' $ claude',
+        '',
+        '   ✻ Welcome to Claude Code!',
+        '',
+    ];
+    const tail = [
+        '       ▝▜█████▛▘',
+        '         ▘▘ ▝▝',
+        '',
+        ` > last commit hash: ${hash}`,
+    ];
+    return [
+        [...head, '        ▐▛███▜▌', ...tail],
+        [...head, '        ▐█████▌', ...tail],
+        [...head, '        ▐▛███▜▌', ...tail],
+    ];
+}
+
 export function activate(context: vscode.ExtensionContext) {
     const disposable = vscode.commands.registerCommand('my-talking-claudik.showInTerminal', async () => {
         const gitExtension = vscode.extensions.getExtension('vscode.git');
@@ -10,100 +32,45 @@ export function activate(context: vscode.ExtensionContext) {
 
         const activatedExtension = await gitExtension.activate();
         const gitAPI = activatedExtension.getAPI(1);
-
-        vscode.window.showWarningMessage(gitAPI.repositories[0]);
         const repository = gitAPI.repositories[0];
 
-        let lastCommitHash: string | undefined;
-        
         if (!repository) {
             vscode.window.showWarningMessage('Не удалось определить repository');
             return;
         }
 
-        repository.state.onDidChange(() => {
-        lastCommitHash = repository.state.HEAD?.commit ?? 'No commits yet';
-
-        renderFrame();
-        });
-
-        // 64ffbcd066d4729c2d834494b648d33881999564
-        // 64ffbcd066d4729c2d834494b648d33881999564   
-
-        const head = repository.state.HEAD;
-
-
-        if (head && head.commit) {
-            lastCommitHash = head.commit;
-        } else {
-            vscode.window.showWarningMessage('Не удалось определить хеш (возможно, в репозитории еще нет коммитов).');
-            return;
-        }
-
         const writeEmitter = new vscode.EventEmitter<string>();
-
-        const frames: string[][] = [
-            [
-                ' $ claude                                 ',
-                '                                          ',
-                '   ✻ Welcome to Claude Code!              ',
-                '                                          ',
-                '        ▐▛███▜▌                           ',
-                '       ▝▜█████▛▘                          ',
-                '         ▘▘ ▝▝                            ',
-                '                                          ',
-                ' > last commit hash: ' + (lastCommitHash || 'N/A') + '  ',
-            ],
-            [
-                ' $ claude                                 ',
-                '                                          ',
-                '   ✻ Welcome to Claude Code!              ',
-                '                                          ',
-                '        ▐█████▌                           ',
-                '       ▝▜█████▛▘                          ',
-                '         ▘▘ ▝▝                            ',
-                '                                          ',
-                ' > last commit hash: ' + (lastCommitHash || 'N/A') + '  ',
-            ],
-			[
-                ' $ claude                                 ',
-                '                                          ',
-                '   ✻ Welcome to Claude Code!              ',
-                '                                          ',
-                '        ▐▛███▜▌                           ',
-                '       ▝▜█████▛▘                          ',
-                '         ▘▘ ▝▝                            ',
-                '                                          ',
-                ' > last commit hash: ' + (lastCommitHash || 'N/A') + '  ',
-            ],
-        ];
-
-		let frameIndex = 0;
+        let frameIndex = 0;
         let timer: NodeJS.Timeout | undefined;
+        let stateSubscription: vscode.Disposable | undefined;
 
         const renderFrame = () => {
-    	let output = '\x1b[H';
+            const hash = repository.state.HEAD?.commit ?? 'No commits yet';
+            const frames = buildFrames(hash);
 
-        lastCommitHash = repository.state.HEAD?.commit ?? 'No commits yet';
+            let output = '\x1b[H';
+            for (const line of frames[frameIndex]) {
+                output += line.padEnd(LINE_WIDTH, ' ') + '\r\n';
+            }
+            writeEmitter.fire(output);
 
-    	for (const line of frames[frameIndex]) {
-    		    output += line.padEnd(44, ' ') + '\r\n';
-    		}
-    		writeEmitter.fire(output);
-    		frameIndex = (frameIndex + 1) % frames.length;
-		};
+            frameIndex = (frameIndex + 1) % frames.length;
+        };
 
         const pty: vscode.Pseudoterminal = {
             onDidWrite: writeEmitter.event,
             open: () => {
                 renderFrame();
                 timer = setInterval(renderFrame, 500);
+                stateSubscription = repository.state.onDidChange(renderFrame);
             },
             close: () => {
                 if (timer) {
                     clearInterval(timer);
                     timer = undefined;
                 }
+                stateSubscription?.dispose();
+                writeEmitter.dispose();
             },
         };
 
