@@ -57,11 +57,12 @@ export function activate(context: vscode.ExtensionContext) {
         let timer: NodeJS.Timeout | undefined;
         let stateSubscription: vscode.Disposable | undefined;
 
-        const renderFrame = () => { // 326e67b1e82286b9cb1018d564855b3f0ae91c7d
+        const renderFrame = () => {
             const hash = repository.state.HEAD?.commit ?? 'No commits yet';
             if (hash !== prev_hash) {
                 addExperience(50);
                 prev_hash = hash;
+                context.globalState.update('prev_hash', prev_hash);
             }
             const frames = buildFrames(hash, experience, stateXp);
 
