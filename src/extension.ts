@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 const LINE_WIDTH = 70;
 
-function buildFrames(hash: string): string[][] {
+function buildFrames(hash: string, experience: number, stateXp: string): string[][] {
     const head = [
         ' $ claude',
         '',
@@ -13,7 +13,8 @@ function buildFrames(hash: string): string[][] {
         '       ▝▜█████▛▘',
         '         ▘▘ ▝▝',
         '',
-        ` > last commit hash: ${hash}`,
+        `         > last commit hash: ${hash}`,
+        `         > experience: ${experience}xp   ${stateXp}`,
     ];
     return [
         [...head, '        ▐▛███▜▌', ...tail],
@@ -24,6 +25,18 @@ function buildFrames(hash: string): string[][] {
 
 export function activate(context: vscode.ExtensionContext) {
     const disposable = vscode.commands.registerCommand('my-talking-claudik.showInTerminal', async () => {
+
+        let experience: number = context.globalState.get<number>('experience', 0);
+        let stateXp: string = '';
+
+        async function addExperience(amount: number) {
+            experience += amount;
+            stateXp = `+ ${amount}xp`;
+
+            await context.globalState.update('experience', experience);
+
+        }    
+
         const gitExtension = vscode.extensions.getExtension('vscode.git');
         if (!gitExtension) {
             vscode.window.showWarningMessage('Не удалось определить gitExtension');
@@ -46,7 +59,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         const renderFrame = () => {
             const hash = repository.state.HEAD?.commit ?? 'No commits yet';
-            const frames = buildFrames(hash);
+            const frames = buildFrames(hash, experience, stateXp);
 
             let output = '\x1b[H';
             for (const line of frames[frameIndex]) {
@@ -55,6 +68,7 @@ export function activate(context: vscode.ExtensionContext) {
             writeEmitter.fire(output);
 
             frameIndex = (frameIndex + 1) % frames.length;
+            stateXp = '';
         };
 
         const pty: vscode.Pseudoterminal = {
