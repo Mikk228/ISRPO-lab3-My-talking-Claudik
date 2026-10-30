@@ -27,6 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
     const disposable = vscode.commands.registerCommand('my-talking-claudik.showInTerminal', async () => {
 
         let experience: number = context.globalState.get<number>('experience', 0);
+        let prev_hash: string = context.globalState.get<string>('prev_hash', '');
         let stateXp: string = '';
 
         async function addExperience(amount: number) {
@@ -34,7 +35,6 @@ export function activate(context: vscode.ExtensionContext) {
             stateXp = `+ ${amount}xp`;
 
             await context.globalState.update('experience', experience);
-
         }    
 
         const gitExtension = vscode.extensions.getExtension('vscode.git');
@@ -57,8 +57,12 @@ export function activate(context: vscode.ExtensionContext) {
         let timer: NodeJS.Timeout | undefined;
         let stateSubscription: vscode.Disposable | undefined;
 
-        const renderFrame = () => {
+        const renderFrame = () => { // 326e67b1e82286b9cb1018d564855b3f0ae91c7d
             const hash = repository.state.HEAD?.commit ?? 'No commits yet';
+            if (hash !== prev_hash) {
+                addExperience(50);
+                prev_hash = hash;
+            }
             const frames = buildFrames(hash, experience, stateXp);
 
             let output = '\x1b[H';
