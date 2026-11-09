@@ -84,7 +84,7 @@ let current = { text: '', until: 0, priority: 0 };
 let error_now = false;
 let terminal: vscode.Terminal | undefined;
 
-function BuildFrames(hash: string, experience: number, state_xp: string, phrase: string): string[][] {
+function BuildFrames(hash: string, branch: string, changes: number, experience: number, state_xp: string, phrase: string): string[][] {
     const head = [
         ' $ claudik',
         '',
@@ -95,7 +95,8 @@ function BuildFrames(hash: string, experience: number, state_xp: string, phrase:
         '       ▝▜█████▛▘',
         '         ▘▘ ▝▝',
         '',
-        `   > last commit hash: ${hash}`,
+        `   > branch: ${branch}     > last commit hash: ${hash}`,
+        `   > changes: ${changes}`,
         `   > experience: ${experience}xp   ${state_xp}`,
         `   > level: ${BuildLevelLine(experience)}`,
     ];
@@ -204,6 +205,10 @@ export function activate(context: vscode.ExtensionContext) {
         const RenderFrame = (advance: boolean = false) => {
             const hash: string | undefined = repository.state.HEAD?.commit;
             const branch: string | undefined = repository.state.HEAD?.name;
+            const changes =
+                (repository.state.workingTreeChanges?.length ?? 0) +
+                (repository.state.indexChanges?.length ?? 0) +
+                (repository.state.mergeChanges?.length ?? 0);
 
             experience = context.globalState.get<number>('experience', 0);
 
@@ -221,7 +226,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             CheckPhrasesTime();
 
-            const frames = BuildFrames((hash ?? 'No commits yet').slice(0, 7), experience, state_xp, current.text);
+            const frames = BuildFrames((hash ?? 'No commits yet').slice(0, 7), branch ?? 'No branch', changes, experience, state_xp, current.text);
 
             let output = '\x1b[H';
 
