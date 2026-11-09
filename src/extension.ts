@@ -1,15 +1,13 @@
-import { types } from 'util';
 import * as vscode from 'vscode';
 
 const LINE_WIDTH = 70;
 
 interface GlobalPhrases {
     phrases: string[];
-    time_stop: number;
-    state?: boolean;
+    priority: number;
 };
 
-let phrase_welcom: GlobalPhrases = {
+const phrase_welcome: GlobalPhrases = {
     phrases: [
         "Ready to write some code?",
         "Hey! I missed this workspace.",
@@ -18,31 +16,27 @@ let phrase_welcom: GlobalPhrases = {
         "What are we building today?",
         "Welcome back, developer!",
     ],
-    time_stop: 0,
-    state: true,
+    priority: 1,
 };
 
-let phrase_commit: GlobalPhrases = {
-    phrases:[
+const phrase_commit: GlobalPhrases = {
+    phrases: [
         "Saved in history forever!",
         "Git happens!",
         "Commit successful. I'm proud!",
         "Another piece of the puzzle!",
     ],
-    time_stop: 0,
-    state: false,
+    priority: 2,
 };
 
-let phrase_fix_error: GlobalPhrases = {
+const phrase_fix_error: GlobalPhrases = {
     phrases: [
         "Wait... did we fix it?",
     ],
-    time_stop: 0,
-    state: false,
+    priority: 3,
 };
-let error_now = false;
 
-let phrase_working: GlobalPhrases = {
+const phrase_working: GlobalPhrases = {
     phrases: [
         "Interesting approach...",
         "One line at a time.",
@@ -50,13 +44,14 @@ let phrase_working: GlobalPhrases = {
         "Focus mode: activated.",
         "This is getting exciting!"
     ],
-    time_stop: 0,
-    state: false,
+    priority: 0,
 };
 
+const PRIORITY_ERROR = 4;
 
-let phrase: string = '';
-GetRandomPhrase(phrase_welcom, 5000);
+let current = { text: '', until: 0, priority: 0 };
+let error_now = false;
+let terminal: vscode.Terminal | undefined;
 
 function BuildFrames(hash: string, experience: number, state_xp: string, phrase: string): string[][] {
     const head = [
@@ -79,31 +74,53 @@ function BuildFrames(hash: string, experience: number, state_xp: string, phrase:
     ];
 }
 
-function GetRandomPhrase(type_phrase: GlobalPhrases = phrase_working, show_time: number = 4000) {
-    if (!phrase_fix_error.state || (type_phrase === phrase_fix_error)) {
-        phrase = type_phrase.phrases[Math.floor(Math.random() * type_phrase.phrases.length)];
-        type_phrase.time_stop = Date.now() + show_time;
-        type_phrase.state = true;
+function Say(text: string, show_time: number, priority: number) {
+    if (Date.now() < current.until && priority < current.priority) {
+        return;
     }
+    current = { 
+        text,
+        until: Date.now() + show_time,
+        priority
+    };
+}
+
+function GetRandomPhrase(type_phrase: GlobalPhrases = phrase_working, show_time: number = 4000) {
+    const text = type_phrase.phrases[Math.floor(Math.random() * type_phrase.phrases.length)];
+    Say(text, show_time, type_phrase.priority);
 }
 
 function CheckPhrasesTime() {
-    const types: GlobalPhrases[] = [phrase_fix_error, phrase_welcom, phrase_commit, phrase_working];
-    for (const type of types) {
-        if (!error_now && type.state && Date.now() > type.time_stop){
-            type.time_stop = 0;
-            type.state = false;
-            GetRandomPhrase();
-            break;
-        }
+    if (Date.now() > current.until) {
+        GetRandomPhrase();
+    }
+}
+
+function UpdateErrors() {
+    const errorCount = vscode.languages.getDiagnostics().flatMap(([, diags]) => diags).filter(d => d.severity === vscode.DiagnosticSeverity.Error).length;
+
+    if (errorCount > 0) {
+        current = {
+            text: `Oops... Detected ${errorCount} error(s)`,
+            until: Infinity,
+            priority: PRIORITY_ERROR
+        };
+        error_now = true;
+    } else if (error_now) {
+        error_now = false;
+        current.until = 0;
+        GetRandomPhrase(phrase_fix_error, 2000);
     }
 }
 
 export function activate(context: vscode.ExtensionContext) {
     const disposable = vscode.commands.registerCommand('my-talking-claudik.showInTerminal', async () => {
+        if (terminal) {
+            terminal.show();
+            return;
+        }
 
         let experience: number = context.globalState.get<number>('experience', 0);
-        let prev_hash: string = context.globalState.get<string>('prev_hash', '');
 
         let state_xp: string = '';
         let time_xp_show = 0;
@@ -131,45 +148,57 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
+        const hash_key = `prev_hash:${repository.rootUri.toString()}`;
+        let prev_hash: string = context.globalState.get<string>(hash_key, '');
+        let prev_branch: string | undefined = repository.state.HEAD?.name;
+
         const writeEmitter = new vscode.EventEmitter<string>();
         let frame_index = 0;
         let timer: NodeJS.Timeout | undefined;
         let state_subscription: vscode.Disposable | undefined;
 
-        const RenderFrame = () => {
-            const hash = repository.state.HEAD?.commit ?? 'No commits yet';
-            if (hash !== prev_hash) {
-                AddExperience(50);
+        const RenderFrame = (advance: boolean = false) => {
+            const hash: string | undefined = repository.state.HEAD?.commit;
+            const branch: string | undefined = repository.state.HEAD?.name;
+
+            if (hash && hash !== prev_hash) {
+                if (prev_hash && branch === prev_branch) {
+                    AddExperience(50);
+                    GetRandomPhrase(phrase_commit, 3000);
+                }
                 prev_hash = hash;
-
-                GetRandomPhrase(phrase_commit, 3000);
-
-                context.globalState.update('prev_hash', prev_hash);
+                context.globalState.update(hash_key, prev_hash);
             }
+            prev_branch = branch;
 
             state_xp = Date.now() < time_xp_show ? state_xp : '';
-            
+
             CheckPhrasesTime();
 
-            const frames = BuildFrames(hash.slice(0, 7), experience, state_xp, phrase);
+            const frames = BuildFrames((hash ?? 'No commits yet').slice(0, 7), experience, state_xp, current.text);
 
             let output = '\x1b[H';
 
             for (const line of frames[frame_index]) {
-                output += line.padEnd(LINE_WIDTH, ' ') + '\r\n';
+                output += line.slice(0, LINE_WIDTH).padEnd(LINE_WIDTH, ' ') + '\r\n';
             }
 
             writeEmitter.fire(output);
 
-            frame_index = (frame_index + 1) % frames.length;
+            if (advance) {
+                frame_index = (frame_index + 1) % frames.length;
+            }
         };
 
         const pty: vscode.Pseudoterminal = {
             onDidWrite: writeEmitter.event,
             open: () => {
+                writeEmitter.fire('\x1b[2J\x1b[?25l');
+                GetRandomPhrase(phrase_welcome, 5000);
+                UpdateErrors();
                 RenderFrame();
-                timer = setInterval(RenderFrame, 500);
-                state_subscription = repository.state.onDidChange(RenderFrame);
+                timer = setInterval(() => RenderFrame(true), 500);
+                state_subscription = repository.state.onDidChange(() => RenderFrame());
             },
             close: () => {
                 if (timer) {
@@ -178,35 +207,21 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 state_subscription?.dispose();
                 writeEmitter.dispose();
+                terminal = undefined;
             },
         };
 
-        const terminal = vscode.window.createTerminal({
+        terminal = vscode.window.createTerminal({
             name: 'Claudik Terminal',
             pty,
         });
         terminal.show();
     });
 
-    const diagnosticListener = vscode.languages.onDidChangeDiagnostics((event) => {
-        for (const uri of event.uris) {
-            const diagnostics = vscode.languages.getDiagnostics(uri);
-
-            const errors = diagnostics.filter(  
-            diagnostic =>
-                diagnostic.severity === vscode.DiagnosticSeverity.Error
-            );
-
-            if (errors.length > 0) {
-                phrase = `Oow... Detected ${errors.length} error(s)`;
-                error_now = true;
-            } else if (error_now) {
-                GetRandomPhrase(phrase_fix_error, 2000);
-                error_now = false;
-            }
-        }
+    const diagnosticListener = vscode.languages.onDidChangeDiagnostics(() => {
+        UpdateErrors();
     });
-    
+
     context.subscriptions.push(diagnosticListener);
     context.subscriptions.push(disposable);
 }
