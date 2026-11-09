@@ -1,71 +1,57 @@
-# my-talking-claudik README
+# My Talking Claudik
 
-This is the README for your extension "my-talking-claudik". After writing up a brief description, we recommend including the following sections.
+**My Talking Claudik** — расширение для Visual Studio Code, добавляющее виртуального компаньона по имени Клодик, который отображается в отдельном терминале и реагирует на действия разработчика.
 
-## Features
+Клодик отслеживает состояние Git-репозитория, отображает информацию о текущей ветке и изменениях в проекте, следит за ошибками в коде и получает опыт за создание коммитов.
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+## Функциональность
 
-For example if there is an image subfolder under your extension project workspace:
+### 1. Виртуальный компаньон
 
-\!\[feature X\]\(images/feature-x.png\)
+- Клодик отображается в отдельном терминале VS Code
+- Используется анимация из нескольких кадров
+- Во время работы выводятся случайные фразы, реагирующие на события в проекте
+- Фразы имеют разные приоритеты, поэтому важные сообщения, например об ошибках, не перезаписываются обычными сообщениями
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+### 2. Интеграция с Git
 
-## Requirements
+Расширение использует встроенный Git API VSCode
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+В терминале отображается:
+- Название текущей ветки
+- Хеш последнего коммита
+- Количество изменений в репозитории
 
-## Extension Settings
+При создании нового коммита на текущей ветке Клодик получает 50 XP
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+### 3. Система опыта и уровней
 
-For example:
+Клодик получает опыт за создание коммитов. Количество опыта сохраняется между перезапусками VS Code с помощью `ExtensionContext.globalState`
 
-This extension contributes the following settings:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+| Уровень | Необходимый опыт |
+|---|---:|
+| Intern | 0 XP |
+| Junior | 500 XP |
+| Middle | 1500 XP |
+| Senior | 3500 XP |
 
-## Known Issues
+При повышении уровня Клодик выводит соответствующее сообщение
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+В терминале отображаются:
+- Текущее количество опыта
+- Название уровня
+- Прогресс до следующего уровня
 
-## Release Notes
+### 4. Отслеживание ошибок
 
-Users appreciate release notes as you update your extension.
+- При обнаружении ошибок Клодик выводит соответствующее сообщение
+- Сообщение об ошибках имеет наивысший приоритет
+- После устранения всех ошибок появляется отдельная фраза, сообщающая об их исправлении
 
-### 1.0.0
+### 5. Управление опытом
 
-Initial release of ...
+Для тестирования системы уровней существуют две команды:
 
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+- `Claudik: Increase XP` — увеличивает опыт на 500 XP
+- `Claudik: Decrease XP` — уменьшает опыт на 500 XP, но не ниже нуля
