@@ -20,6 +20,14 @@
       {
         "command": "my-talking-claudik.showInTerminal",
         "title": "Show Claudik Terminal"
+      },
+      {
+        "command": "my-talking-claudik.plusXP",
+        "title": "Claudik: Increase XP"
+      },
+      {
+        "command": "my-talking-claudik.minusXP",
+        "title": "Claudik: Decrease XP"
       }
     ]
   },

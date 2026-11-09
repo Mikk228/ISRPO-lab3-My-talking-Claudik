@@ -49,6 +49,37 @@ const phrase_working: GlobalPhrases = {
 
 const PRIORITY_ERROR = 4;
 
+const LEVELS = [
+    { title: 'Intern', xp: 0 },
+    { title: 'Junior', xp: 500 },
+    { title: 'Middle', xp: 1500 },
+    { title: 'Senior', xp: 3500 },
+];
+
+function GetLevelIndex(xp: number): number {
+    let index = 0;
+    LEVELS.forEach((level, i) => {
+        if (xp >= level.xp) {
+            index = i;
+        }
+    });
+    return index;
+}
+ 
+function BuildLevelLine(xp: number): string {
+    const index = GetLevelIndex(xp);
+    const lvl = LEVELS[index];
+    const next = LEVELS[index + 1];
+ 
+    if (!next) {
+        return `${lvl.title}  [${'█'.repeat(10)}] MAX`;
+    }
+ 
+    const ratio = (xp - lvl.xp) / (next.xp - lvl.xp);
+    const filled = Math.min(10, Math.floor(ratio * 10));
+    return `${lvl.title}  [${'█'.repeat(filled)}${'░'.repeat(10 - filled)}] -> ${next.title}`;
+}
+
 let current = { text: '', until: 0, priority: 0 };
 let error_now = false;
 let terminal: vscode.Terminal | undefined;
@@ -66,6 +97,7 @@ function BuildFrames(hash: string, experience: number, state_xp: string, phrase:
         '',
         `   > last commit hash: ${hash}`,
         `   > experience: ${experience}xp   ${state_xp}`,
+        `   > level: ${BuildLevelLine(experience)}`,
     ];
     return [
         [...head, '        ▐▛███▜▌', ...tail],
@@ -126,9 +158,21 @@ export function activate(context: vscode.ExtensionContext) {
         let time_xp_show = 0;
 
         async function AddExperience(amount: number) {
+            const level_before = GetLevelIndex(experience);
+
             experience += amount;
             state_xp = `+ ${amount}xp`;
             time_xp_show = Date.now() + 4000;
+
+            const level_after = GetLevelIndex(experience);
+
+            if (level_after > level_before) {
+                Say(
+                    `Level up! You are now ${LEVELS[level_after].title}!`,
+                    5000,
+                    2
+                );
+            }
 
             await context.globalState.update('experience', experience);
         }
@@ -155,7 +199,7 @@ export function activate(context: vscode.ExtensionContext) {
         const writeEmitter = new vscode.EventEmitter<string>();
         let frame_index = 0;
         let timer: NodeJS.Timeout | undefined;
-        let state_subscription: vscode.Disposable | undefined;
+        let state_sub: vscode.Disposable | undefined;
 
         const RenderFrame = (advance: boolean = false) => {
             const hash: string | undefined = repository.state.HEAD?.commit;
@@ -198,14 +242,14 @@ export function activate(context: vscode.ExtensionContext) {
                 UpdateErrors();
                 RenderFrame();
                 timer = setInterval(() => RenderFrame(true), 500);
-                state_subscription = repository.state.onDidChange(() => RenderFrame());
+                state_sub = repository.state.onDidChange(() => RenderFrame());
             },
             close: () => {
                 if (timer) {
                     clearInterval(timer);
                     timer = undefined;
                 }
-                state_subscription?.dispose();
+                state_sub?.dispose();
                 writeEmitter.dispose();
                 terminal = undefined;
             },
@@ -224,6 +268,19 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(diagnosticListener);
     context.subscriptions.push(disposable);
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('my-talking-claudik.plusXP', async () => {
+            await context.globalState.update('experience', context.globalState.get<number>('experience', 0) + 500);
+            vscode.window.showInformationMessage('XP increased by 500!');
+        })
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('my-talking-claudik.minusXP', async () => {
+            await context.globalState.update('experience', Math.max(0, context.globalState.get<number>('experience', 0) - 500));
+            vscode.window.showInformationMessage('XP decreased by 500!');
+        })
+    );
 }
 
 export function deactivate() {}
