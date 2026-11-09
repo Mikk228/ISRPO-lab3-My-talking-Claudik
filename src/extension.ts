@@ -205,6 +205,8 @@ export function activate(context: vscode.ExtensionContext) {
             const hash: string | undefined = repository.state.HEAD?.commit;
             const branch: string | undefined = repository.state.HEAD?.name;
 
+            experience = context.globalState.get<number>('experience', 0);
+
             if (hash && hash !== prev_hash) {
                 if (prev_hash && branch === prev_branch) {
                     AddExperience(50);
